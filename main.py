@@ -4,8 +4,6 @@ import sys
 import math
 import random
 
-from numpy import mod
-
 from cell_point import CellPoint
 from cell_line import CellLine
 from chunk import Chunk
