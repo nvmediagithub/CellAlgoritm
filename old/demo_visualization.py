@@ -36,11 +36,6 @@ def get_chunk_for_point(point, chunks):
 # --- Основной алгоритм расширения структуры ---
 
 def expand_structure(chunk_manager: ChunkManager, connection_threshold=300):
-    """
-    Обрабатываем все загруженные чанки. Для каждой точки, которая еще не испустила лучи, генерируем child-лучи.
-    Если новая точка выходит за границы текущего чанка, пытаемся добавить её в соответствующий соседний чанк,
-    если тот загружен.
-    """
     for chunk in chunk_manager.get_loaded_chunks():
         if not chunk.loaded:
             continue
@@ -48,70 +43,56 @@ def expand_structure(chunk_manager: ChunkManager, connection_threshold=300):
         for pt in chunk.points:
             if pt.has_emitted:
                 continue
-            # Если родительская точка имеет определенное направление, используем его, иначе используем случайное направление
+            if not chunk.contains(pt):
+                continue
             base_direction = pt.parent_direction if pt.parent_direction is not None else random.uniform(0, 2 * math.pi)
             rays = generate_child_rays(pt, base_direction, child_count=2, min_length=20, max_length=30,
                                        max_deviation=math.radians(30))
             pt.has_emitted = True
             for (vec, new_angle) in rays:
-                has_emitted = False
                 candidate = (pt.position[0] + vec[0], pt.position[1] + vec[1], 0)
                 candidate_2d = (candidate[0], candidate[1])
                 origin_2d = (pt.position[0], pt.position[1])
-                # Проверяем пересечение с каждой уже существующей линией
+                closest_inter = None
+                # Проверяем пересечение с линиями текущего чанка
                 for line in chunk.lines:
-                    # Берем координаты существующей линии
                     p1 = (line.start.position[0], line.start.position[1])
                     p2 = (line.end.position[0], line.end.position[1])
                     inter = line_intersection(origin_2d, candidate_2d, p1, p2)
                     if inter is not None:
-                        # candidate = (inter[0], inter[1], 0)
-                        candidate = p2
-                        has_emitted = True
-                # Дополнительная проверка: пересечение с линиями из соседних чанков
-                neighbor_keys = chunk_manager.get_neighbor_keys(chunk.grid_pos)
-                for nkey in neighbor_keys:
-                    if nkey in chunk_manager.chunks:
-                        neighbor_chunk = chunk_manager.chunks[nkey]
-                        for line in neighbor_chunk.lines:
-                            p1 = (line.start.position[0], line.start.position[1])
-                            p2 = (line.end.position[0], line.end.position[1])
-                            inter = line_intersection(origin_2d, candidate_2d, p1, p2)
-                            if inter is not None:
-                                candidate = p2
-                                has_emitted = True
-                # Проверяем пересечение с каждой уже существующей линией
-                for line in chunk.lines:
-                    # Берем координаты существующей линии
-                    p1 = (line.start.position[0], line.start.position[1])
-                    p2 = (line.end.position[0], line.end.position[1])
-                    inter = line_intersection(origin_2d, candidate_2d, p1, p2)
-                    if inter is not None:
-                        # candidate = (inter[0], inter[1], 0)
-                        candidate = p2
-                        has_emitted = True
-                # Дополнительная проверка: пересечение с линиями из соседних чанков
-                neighbor_keys = chunk_manager.get_neighbor_keys(chunk.grid_pos)
-                for nkey in neighbor_keys:
-                    if nkey in chunk_manager.chunks:
-                        neighbor_chunk = chunk_manager.chunks[nkey]
-                        for line in neighbor_chunk.lines:
-                            p1 = (line.start.position[0], line.start.position[1])
-                            p2 = (line.end.position[0], line.end.position[1])
-                            inter = line_intersection(origin_2d, candidate_2d, p1, p2)
-                            if inter is not None:
-                                candidate = p2
-                                has_emitted = True
-
+                        # Можно также вычислить расстояние до пересечения и сохранить ближайшее
+                        closest_inter = inter
+                        # break  # Если хотим брать первое найденное пересечение
+                # Проверяем линии из соседних чанков, если пересечение не найдено или нужно обновить
+                if closest_inter is None:
+                    neighbor_keys = chunk_manager.get_neighbor_keys(chunk.grid_pos)
+                    for nkey in neighbor_keys:
+                        if nkey in chunk_manager.chunks:
+                            neighbor_chunk = chunk_manager.chunks[nkey]
+                            if neighbor_chunk.loaded:
+                                for line in neighbor_chunk.lines:
+                                    p1 = (line.start.position[0], line.start.position[1])
+                                    p2 = (line.end.position[0], line.end.position[1])
+                                    inter = line_intersection(origin_2d, candidate_2d, p1, p2)
+                                    if inter is not None:
+                                        closest_inter = inter
+                                #         break
+                                # if closest_inter is not None:
+                                #     break
+                # Если пересечение найдено, используем точку пересечения
+                if closest_inter is not None:
+                    candidate = (closest_inter[0], closest_inter[1], 0)
+                    candidate_2d = (candidate[0], candidate[1])
+                    has_emitted = True
+                else:
+                    has_emitted = False
                 new_point = CellPoint(candidate, parent_direction=new_angle)
                 new_point.has_emitted = has_emitted
                 new_points.append(new_point)
                 new_line = CellLine(pt, new_point)
                 chunk.add_line(new_line)
 
-        # Добавляем новые точки, но только те, которые внутри текущего чанка
         for np in new_points:
-            # Попытка добавить точку в соответствующий чанк
             target_chunk = chunk_manager.get_chunk_for_point(np.position)
             if target_chunk is not None:
                 target_chunk.add_point(np)
@@ -183,7 +164,7 @@ def main():
     central_chunk.add_point(start_point)
 
     # Генерируем начальные лучи из стартовой точки
-    initial_rays = generate_initial_rays(start_point, ray_count=8, min_length=20, max_length=30)
+    initial_rays = generate_initial_rays(start_point, ray_count=2, min_length=20, max_length=30)
     start_point.has_emitted = True
     for (vec, angle) in initial_rays:
         new_x = start_point.position[0] + vec[0]
