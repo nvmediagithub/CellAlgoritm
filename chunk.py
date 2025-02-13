@@ -1,5 +1,5 @@
 # chunk.py
-from typing import List
+from typing import Optional, List, Tuple, Set
 from cell_point import CellPoint
 from cell_line import CellLine
 
@@ -14,20 +14,18 @@ class Chunk:
         width (int): Ширина чанка.
         height (int): Высота чанка.
         loaded (bool): Флаг, указывающий, загружен ли чанк.
-        grid_pos (Optional[Tuple[int, int]]): Позиция чанка в сетке (например, (i, j)).
-        points (List[CellPoint]): Список точек, принадлежащих этому чанку.
         lines (List[CellLine]): Список линий, находящихся в чанке.
-        polygons (List): Список полигонов, если потребуется (например, объекты CellPolygon).
+        grid_pos (Optional[Tuple[int, int]]): Позиция чанка в сетке (например, (i, j)).
     """
     def __init__(self, x: int, y: int, width: int, height: int,
-                 loaded: bool = True) -> None:
+                 loaded: bool = True, grid_pos: Optional[Tuple[int, int]] = None) -> None:
         self.x: int = x
         self.y: int = y
         self.width: int = width
         self.height: int = height
         self.loaded: bool = loaded
-        self.lines: List[CellLine] = []
-        # self.polygons: List = []  # Если используется класс CellPolygon, можно указать List[CellPolygon]
+        self.grid_pos: Optional[Tuple[int, int]] = grid_pos
+        self.lines: Set[CellLine] = []
 
     def contains(self, point: CellPoint) -> bool:
         """
@@ -46,10 +44,11 @@ class Chunk:
         """
         self.lines.append(line)
 
+
     def __repr__(self) -> str:
         return (f"Chunk(x={self.x}, "
                 f"y={self.y}, "
                 f"width={self.width}, "
                 f"height={self.height}, "
                 f"loaded={self.loaded}, "
-                f"lines={len(self.lines)})")
+                )

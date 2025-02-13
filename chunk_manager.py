@@ -1,5 +1,10 @@
 # chunk_manager.py
+import math
 from typing import Tuple, Dict, Any, List
+
+from CellAlgoritm.cell_line import CellLine
+from CellAlgoritm.cell_point import CellPoint
+from CellAlgoritm.cell_structure_utils import line_intersection, calculate_angle, generate_child_rays, distance
 from chunk import Chunk
 
 
@@ -20,7 +25,7 @@ class ChunkManager:
         self.chunk_height: int = chunk_height
         self.chunks: Dict[Tuple[int, int], Chunk] = {}  # ключ: (i, j), значение: объект Chunk
 
-    def get_chunk_key_for_point(self, point: Tuple[float, ...]) -> Tuple[int, int]:
+    def get_chunk_key_for_point(self, point: CellPoint) -> Tuple[int, int]:
         """
         Определяет ключ чанка по координате точки.
 
@@ -30,11 +35,11 @@ class ChunkManager:
         Returns:
             Tuple[int, int]: ключ, определяющий положение чанка в сетке.
         """
-        x = point[0]
-        y = point[1]
+        x = point.x
+        y = point.y
         i = int((x - self.origin[0]) // self.chunk_width)
         j = int((y - self.origin[1]) // self.chunk_height)
-        return (i, j)
+        return i, j
 
     def get_neighbor_keys(self, key: Tuple[int, int]) -> List[Tuple[int, int]]:
         """
@@ -77,7 +82,7 @@ class ChunkManager:
                 y = self.origin[1] + nkey[1] * self.chunk_height
                 self.chunks[nkey] = Chunk(x, y, self.chunk_width, self.chunk_height, loaded=False, grid_pos=nkey)
 
-    def get_chunk_for_point(self, point: Tuple[float, ...]) -> Any:
+    def get_chunk_for_point(self, point: CellPoint) -> Any:
         """
         Возвращает чанк, в который попадает данная точка.
 
@@ -106,6 +111,55 @@ class ChunkManager:
             List[Chunk]: список загруженных чанков.
         """
         return [c for c in self.chunks.values() if c.loaded]
+
+    def expand_structure(self, connection_threshold=300):
+        for chunk in self.chunks.values():
+            if not chunk.loaded:
+                continue
+            new_lines = []
+            for chunk_line in chunk.lines:
+                p_start = chunk_line.start
+                p_end = chunk_line.end
+                if p_end.has_emitted:
+                    continue
+                p_end.has_emitted = True
+                base_direction = calculate_angle(p_start.x, p_start.y, p_end.x, p_end.y)
+                target_points = generate_child_rays(p_end, base_direction, child_count=3, min_length=40, max_length=60,
+                                           max_deviation=math.radians(90))
+                for i in range(len(target_points)):
+                    for line in chunk.lines:
+                        inter = line_intersection(p_end, target_points[i], line.start, line.end)
+                        if inter is not None:
+                            target_points[i] = line.start if distance(inter, line.start) < \
+                                                  distance(inter, line.end) else line.end
+                            # target_points[i].has_emitted = True
+
+                    neighbor_keys = self.get_neighbor_keys(chunk.grid_pos)
+                    for neighbor_key in neighbor_keys:
+                        if neighbor_key in self.chunks:
+                            neighbor_chunk = self.chunks[neighbor_key]
+                            for line in neighbor_chunk.lines:
+                                inter = line_intersection(p_end, target_points[i], line.start, line.end)
+                                if inter is not None:
+                                    target_points[i] = line.start if distance(inter, line.start) < \
+                                                          distance(inter, line.end) else line.end
+                                    # target_points[i].has_emitted = True
+
+                    for line in new_lines:
+                        inter = line_intersection(p_end, target_points[i], line.start, line.end)
+                        if inter is not None:
+                            target_points[i] = line.start if distance(inter, line.start) < \
+                                                  distance(inter, line.end) else line.end
+                            # target_points[i].has_emitted = True
+
+                    new_line = CellLine(p_end, target_points[i])
+                    new_lines.append(new_line)
+
+            for line in new_lines:
+                target_chunk = self.get_chunk_for_point(line.start)
+                if target_chunk is not None:
+                    target_chunk.add_line(line)
+
 
     def __repr__(self) -> str:
         return f"ChunkManager(origin={self.origin}, chunk_size=({self.chunk_width}x{self.chunk_height}), total_chunks={len(self.chunks)})"
