@@ -18,12 +18,12 @@ class Chunk:
         grid_pos (Optional[Tuple[int, int]]): Позиция чанка в сетке (например, (i, j)).
     """
     def __init__(self, x: int, y: int, width: int, height: int,
-                 loaded: bool = True, grid_pos: Optional[Tuple[int, int]] = None) -> None:
+                 need_expand: bool = True, grid_pos: Optional[Tuple[int, int]] = None) -> None:
         self.x: int = x
         self.y: int = y
         self.width: int = width
         self.height: int = height
-        self.loaded: bool = loaded
+        self.need_expand: bool = need_expand
         self.grid_pos: Optional[Tuple[int, int]] = grid_pos
         self.lines: Set[CellLine] = []
 

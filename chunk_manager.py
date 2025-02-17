@@ -71,16 +71,16 @@ class ChunkManager:
         if key not in self.chunks:
             x = self.origin[0] + key[0] * self.chunk_width
             y = self.origin[1] + key[1] * self.chunk_height
-            self.chunks[key] = Chunk(x, y, self.chunk_width, self.chunk_height, loaded=True, grid_pos=key)
+            self.chunks[key] = Chunk(x, y, self.chunk_width, self.chunk_height, need_expand=True, grid_pos=key)
         else:
-            self.chunks[key].loaded = True
+            self.chunks[key].need_expand = True
 
         # Создаем соседние чанки как незагруженные, если их еще нет
         for nkey in self.get_neighbor_keys(key):
             if nkey not in self.chunks:
                 x = self.origin[0] + nkey[0] * self.chunk_width
                 y = self.origin[1] + nkey[1] * self.chunk_height
-                self.chunks[nkey] = Chunk(x, y, self.chunk_width, self.chunk_height, loaded=False, grid_pos=nkey)
+                self.chunks[nkey] = Chunk(x, y, self.chunk_width, self.chunk_height, need_expand=False, grid_pos=nkey)
 
     def get_chunk_for_point(self, point: CellPoint) -> Any:
         """
@@ -114,7 +114,7 @@ class ChunkManager:
 
     def expand_structure(self, connection_threshold=300):
         for chunk in self.chunks.values():
-            if not chunk.loaded:
+            if not chunk.need_expand:
                 continue
             new_lines = []
             for chunk_line in chunk.lines:

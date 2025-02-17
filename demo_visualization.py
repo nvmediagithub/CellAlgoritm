@@ -28,7 +28,7 @@ def visualize_chunks(chunk_manager: ChunkManager):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 target = chunk_manager.get_chunk_for_point(CellPoint(mouse_pos[0], mouse_pos[1]))
-                if target and not target.loaded:
+                if target and not target.need_expand:
                     chunk_manager.load_chunk(chunk_manager.get_chunk_key_for_point(CellPoint(mouse_pos[0], mouse_pos[1])))
                     print("Loaded chunk at", target.grid_pos)
                 # Выполняем несколько итераций расширения
@@ -38,10 +38,10 @@ def visualize_chunks(chunk_manager: ChunkManager):
         screen.fill((30, 30, 30))
         # Рисуем границы всех чанков
         for chunk in chunk_manager.chunks.values():
-            color = (0, 255, 0) if chunk.loaded else (255, 0, 0)
+            color = (0, 255, 0) if chunk.need_expand else (255, 0, 0)
             rect = pygame.Rect(chunk.x, chunk.y, chunk.width, chunk.height)
             pygame.draw.rect(screen, color, rect, 3)
-            if chunk.loaded:
+            if chunk.need_expand:
                 for line in chunk.lines:
                     start = (int(line.start.position[0]), int(line.start.position[1]))
                     end = (int(line.end.position[0]), int(line.end.position[1]))
